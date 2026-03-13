@@ -1,0 +1,32 @@
+from __future__ import annotations
+
+from fastapi.testclient import TestClient
+
+from workspace_ai.app.main import build_app
+
+
+def test_session_create_list_delete_and_meta(monkeypatch, isolated_workspace_env):
+    monkeypatch.setenv("WORKSPACE_STORAGE_PATH", str(isolated_workspace_env))
+    app = build_app()
+    client = TestClient(app)
+
+    create = client.post("/workspace/sessions", json={"project_id": "workspace", "title": "API test", "mode": "chat"})
+    assert create.status_code == 200
+    payload = create.json()
+    session_id = payload["session"]["session_id"]
+
+    listed = client.get("/workspace/sessions", params={"project_id": "workspace"})
+    assert listed.status_code == 200
+    assert any(session["session_id"] == session_id for session in listed.json()["sessions"])
+
+    meta = client.get("/workspace/meta")
+    assert meta.status_code == 200
+    meta_payload = meta.json()
+    assert meta_payload["storage_path"].endswith("workspace.db")
+    assert "storage_size_bytes" in meta_payload
+    assert "runtime_log_size_bytes" in meta_payload
+    assert "size_warnings" in meta_payload
+
+    deleted = client.delete(f"/workspace/sessions/{session_id}")
+    assert deleted.status_code == 200
+    assert deleted.json()["deleted_session_id"] == session_id

@@ -5,6 +5,22 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pathlib import Path
 
+
+def _path_size_bytes(path: Path) -> int:
+    if not path.exists():
+        return 0
+    if path.is_file():
+        return path.stat().st_size
+    return sum(item.stat().st_size for item in path.rglob("*") if item.is_file())
+
+
+def _size_warning(bytes_value: int, *, warn_at: int, critical_at: int, label: str) -> str | None:
+    if bytes_value >= critical_at:
+        return f"critical: {label} exceeds {critical_at // (1024 * 1024)} MB"
+    if bytes_value >= warn_at:
+        return f"warning: {label} exceeds {warn_at // (1024 * 1024)} MB"
+    return None
+
 from workspace_ai.adapters.null_adapter import NullAdapter
 from workspace_ai.adapters.external_adapter import ExternalAdapter
 from workspace_ai.app.settings import get_settings
@@ -40,10 +56,25 @@ def build_app() -> FastAPI:
     @app.get("/workspace/meta")
     def meta() -> dict:
         root = Path(__file__).resolve().parents[2]
+        log_dir = root / "workspace_ai" / ".runtime_logs"
+        db_size_bytes = _path_size_bytes(settings.storage_path)
+        log_size_bytes = _path_size_bytes(log_dir)
+        warnings = [
+            warning
+            for warning in [
+                _size_warning(db_size_bytes, warn_at=500 * 1024 * 1024, critical_at=2 * 1024 * 1024 * 1024, label="workspace.db"),
+                _size_warning(log_size_bytes, warn_at=1024 * 1024 * 1024, critical_at=5 * 1024 * 1024 * 1024, label="runtime logs"),
+            ]
+            if warning
+        ]
         return {
             "status": "ok",
             "project_root": str(root),
             "storage_path": str(settings.storage_path),
+            "storage_size_bytes": db_size_bytes,
+            "runtime_log_path": str(log_dir),
+            "runtime_log_size_bytes": log_size_bytes,
+            "size_warnings": warnings,
             "env_workspace_path": str(root / ".env.workspace"),
             "env_secret_path": str(root / ".env.workspace.secret"),
             "default_launch": "./workspace.sh start",
