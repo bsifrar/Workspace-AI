@@ -37,6 +37,19 @@ def build_app() -> FastAPI:
     def ui() -> str:
         return (Path(__file__).resolve().parents[1] / "ui" / "index.html").read_text(encoding="utf-8")
 
+    @app.get("/workspace/meta")
+    def meta() -> dict:
+        root = Path(__file__).resolve().parents[2]
+        return {
+            "status": "ok",
+            "project_root": str(root),
+            "storage_path": str(settings.storage_path),
+            "env_workspace_path": str(root / ".env.workspace"),
+            "env_secret_path": str(root / ".env.workspace.secret"),
+            "default_launch": "./workspace.sh start",
+            "external_launch": "WORKSPACE_ADAPTER_MODE=external ./workspace.sh start",
+        }
+
     return app
 
 

@@ -391,6 +391,7 @@
           <div id="status" class="status-grid muted">Loading...</div>
           <p id="modeSummary" class="help-text" style="margin-top:10px;"></p>
           <p id="statusWarnings" class="help-text warning" style="margin-top:10px;"></p>
+          <div id="metaSummary" class="help-text" style="margin-top:10px;"></div>
         </div>
         <div class="panel">
           <div class="toolbar">
@@ -603,6 +604,7 @@
       messageSearch: "",
       wizardMode: "null",
       wizardOpenedOnce: false,
+      meta: null,
     };
 
     async function api(path, options = {}) {
@@ -632,6 +634,7 @@
 
     function setSidebarTab(tab) {
       state.sidebarTab = tab;
+      localStorage.setItem("workspace.sidebarTab", tab);
       for (const name of ["control", "sessions", "imports"]) {
         document.getElementById(`tabBtn${name.charAt(0).toUpperCase()}${name.slice(1)}`).classList.toggle("active", name === tab);
         document.getElementById(`tab${name.charAt(0).toUpperCase()}${name.slice(1)}`).classList.toggle("active", name === tab);
@@ -673,6 +676,22 @@
     function parseError(error) {
       if (!error) return "Unknown error";
       return String(error.message || error).replace(/^Error:\s*/, "");
+    }
+
+    function persistUIState() {
+      localStorage.setItem("workspace.sidebarTab", state.sidebarTab || "control");
+      localStorage.setItem("workspace.projectId", document.getElementById("projectId")?.value || "workspace");
+      localStorage.setItem("workspace.importProjectId", document.getElementById("importProjectId")?.value || "workspace");
+      if (state.sessionId) localStorage.setItem("workspace.lastSessionId", state.sessionId);
+    }
+
+    function restoreUIState() {
+      const sidebarTab = localStorage.getItem("workspace.sidebarTab");
+      const projectId = localStorage.getItem("workspace.projectId");
+      const importProjectId = localStorage.getItem("workspace.importProjectId");
+      if (projectId) document.getElementById("projectId").value = projectId;
+      if (importProjectId) document.getElementById("importProjectId").value = importProjectId;
+      if (sidebarTab) setSidebarTab(sidebarTab);
     }
 
     function truncate(text, max = 240) {
@@ -778,6 +797,7 @@
     }
 
     function openSetupWizard() {
+      state.wizardOpenedOnce = true;
       prefillWizardFromSettings();
       const node = document.getElementById("setupWizard");
       node.classList.add("visible");
@@ -849,6 +869,10 @@
       document.getElementById("modeSummary").textContent = status.adapter?.adapter_mode === "external"
         ? `External mode: ${settings.external_base_url || status.adapter?.external_base_url || "base URL not set"}`
         : "Local mode: Workspace is running without any external dependency.";
+      const meta = state.meta || {};
+      document.getElementById("metaSummary").innerHTML = meta.project_root
+        ? `<strong>Project root</strong>: ${esc(meta.project_root)}<br /><strong>Storage</strong>: ${esc(meta.storage_path || "")}`
+        : "";
       document.getElementById("adapterMode").textContent = status.adapter?.adapter_mode || "adapter";
       renderSetupChecklist();
     }
@@ -1127,6 +1151,7 @@
       state.selectedMessageId = null;
       state.currentSession = state.sessions.find(session => session.session_id === sessionId) || null;
       document.getElementById("chatTitle").textContent = title || sessionId;
+      persistUIState();
       renderSessions();
       await loadMessages();
     }
@@ -1150,10 +1175,18 @@
       state.status = await api("/workspace/status");
     }
 
+    async function loadMeta() {
+      state.meta = await api("/workspace/meta");
+    }
+
     async function loadSessions() {
       const projectId = document.getElementById("projectId").value.trim() || "workspace";
       const payload = await api(`/workspace/sessions?project_id=${encodeURIComponent(projectId)}&limit=50`);
       state.sessions = payload.sessions || [];
+      const savedSessionId = localStorage.getItem("workspace.lastSessionId");
+      if ((!state.sessionId || !state.sessions.some(session => session.session_id === state.sessionId)) && savedSessionId && state.sessions.some(session => session.session_id === savedSessionId)) {
+        state.sessionId = savedSessionId;
+      }
       if (!state.sessionId && state.sessions.length) {
         state.sessionId = state.sessions[0].session_id;
         document.getElementById("chatTitle").textContent = state.sessions[0].title;
@@ -1163,7 +1196,7 @@
     }
 
     async function loadAll() {
-      await Promise.all([loadStatus(), loadSettings(), loadSessions()]);
+      await Promise.all([loadStatus(), loadSettings(), loadSessions(), loadMeta()]);
       renderStatus();
       renderSessions();
       await loadMessages();
@@ -1208,6 +1241,7 @@
           }),
         });
         document.getElementById("apiKey").value = "";
+        persistUIState();
         await loadAll();
         statusEl.textContent = options.setup
           ? "First-run setup complete. Workspace is ready."
@@ -1323,6 +1357,8 @@
       const fileInput = document.getElementById("importFile");
       if (!fileInput.files || !fileInput.files.length) return showToast("Choose one or more conversations-*.json files first.", "error");
       const statusEl = document.getElementById("importStatus");
+      const detailsEl = document.getElementById("importDetails");
+      persistUIState();
       statusEl.textContent = `Importing ${fileInput.files.length} file(s)...`;
       try {
         const form = new FormData();
@@ -1407,6 +1443,7 @@
     }
 
     toggleImportLimit();
+    restoreUIState();
     loadAll();
   </script>
 </body>
