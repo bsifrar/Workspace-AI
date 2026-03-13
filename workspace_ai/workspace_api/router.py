@@ -58,6 +58,10 @@ def build_router(manager: SessionManager) -> APIRouter:
     def update_session_status(session_id: str, request: SessionStatusUpdateRequest) -> dict:
         return manager.update_session_status(session_id=session_id, status=request.status)
 
+    @router.delete("/sessions/{session_id}")
+    def delete_session(session_id: str) -> dict:
+        return manager.delete_session(session_id=session_id)
+
     @router.get("/sessions/search")
     def search_sessions(q: str, project_id: str | None = None, limit: int = 25) -> dict:
         return manager.search_sessions(query=q, project_id=project_id, limit=limit)

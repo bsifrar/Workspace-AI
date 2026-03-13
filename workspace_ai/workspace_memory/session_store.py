@@ -118,6 +118,12 @@ class SessionStore:
             conn.commit()
         return self.get_session(session_id)
 
+    def delete_session(self, *, session_id: str) -> bool:
+        with self._connect() as conn:
+            row = conn.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+            conn.commit()
+        return bool(row.rowcount)
+
     def list_sessions(self, *, project_id: str | None = None, limit: int = 50) -> List[Dict[str, Any]]:
         sql = "SELECT * FROM sessions"
         params: list[Any] = []

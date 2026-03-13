@@ -493,6 +493,7 @@
               <button onclick="newChat()">New Chat</button>
               <button class="secondary" onclick="cloneCurrentSession()">Clone</button>
               <button class="secondary" onclick="archiveCurrentSession()">Archive</button>
+              <button class="secondary" onclick="deleteCurrentSession()">Delete</button>
             </div>
             <div class="pill" id="adapterMode">adapter</div>
           </div>
@@ -505,6 +506,7 @@
         <div id="chatLog" class="chat-log"></div>
         <div class="composer">
           <textarea id="prompt" placeholder="Ask the workspace something important..."></textarea>
+          <div id="draftStatus" class="help-text muted">Drafts save automatically per session. Press Cmd/Ctrl+Enter to send.</div>
           <div style="display:flex; gap:10px; flex-wrap: wrap;">
             <button onclick="sendPrompt()">Send</button>
             <button class="secondary" onclick="resumeImport()">Resume Imported Chat</button>
@@ -606,6 +608,39 @@
       wizardOpenedOnce: false,
       meta: null,
     };
+
+    function draftStorageKey(sessionId) {
+      return `workspace.draft.${sessionId || "global"}`;
+    }
+
+    function saveDraftValue() {
+      const promptEl = document.getElementById("prompt");
+      if (!promptEl) return;
+      const value = promptEl.value || "";
+      localStorage.setItem(draftStorageKey(state.sessionId), value);
+      const draftStatus = document.getElementById("draftStatus");
+      if (draftStatus) {
+        draftStatus.textContent = value.trim()
+          ? "Draft saved locally for this session. Press Cmd/Ctrl+Enter to send."
+          : "Drafts save automatically per session. Press Cmd/Ctrl+Enter to send.";
+      }
+    }
+
+    function restoreDraftValue() {
+      const promptEl = document.getElementById("prompt");
+      if (!promptEl) return;
+      promptEl.value = localStorage.getItem(draftStorageKey(state.sessionId)) || "";
+      saveDraftValue();
+    }
+
+    function clearDraftValue(sessionId) {
+      localStorage.removeItem(draftStorageKey(sessionId));
+      if (state.sessionId === sessionId) {
+        const promptEl = document.getElementById("prompt");
+        if (promptEl) promptEl.value = "";
+        saveDraftValue();
+      }
+    }
 
     async function api(path, options = {}) {
       const response = await fetch(path, {
@@ -1153,6 +1188,7 @@
       document.getElementById("chatTitle").textContent = title || sessionId;
       persistUIState();
       renderSessions();
+      restoreDraftValue();
       await loadMessages();
     }
 
@@ -1276,9 +1312,11 @@
     async function sendPrompt() {
       if (!state.sessionId) return showToast("Create or select a session first.", "error");
       if (state.currentSession?.status === "archived") return showToast("This session is archived. Clone or start a new chat to continue.", "error");
-      const prompt = document.getElementById("prompt").value.trim();
+      const promptEl = document.getElementById("prompt");
+      const prompt = promptEl.value.trim();
       if (!prompt) return;
-      document.getElementById("prompt").value = "";
+      promptEl.value = "";
+      clearDraftValue(state.sessionId);
       const chatLog = document.getElementById("chatLog");
       const userNode = document.createElement("div");
       userNode.className = "msg user";
@@ -1437,13 +1475,47 @@
       setSidebarTab("sessions");
     }
 
+    async function deleteCurrentSession() {
+      if (!state.sessionId) return showToast("Select a session first.", "error");
+      const label = state.currentSession?.title || state.sessionId;
+      if (!window.confirm(`Delete session "${label}"? This removes its local messages and checkpoints.`)) return;
+      const deletingSessionId = state.sessionId;
+      await api(`/workspace/sessions/${deletingSessionId}`, { method: "DELETE" });
+      clearDraftValue(deletingSessionId);
+      state.sessionId = null;
+      state.currentSession = null;
+      state.selectedMessageId = null;
+      localStorage.removeItem("workspace.lastSessionId");
+      await loadSessions();
+      const nextSession = (state.sessions || []).find(session => session.status !== "archived") || state.sessions[0] || null;
+      if (nextSession) {
+        await selectSession(nextSession.session_id, nextSession.title);
+      } else {
+        document.getElementById("chatTitle").textContent = "No session selected";
+        document.getElementById("chatMeta").textContent = "Choose or create a session.";
+        renderMessages([]);
+        restoreDraftValue();
+      }
+      renderSessions();
+      showToast("Session deleted.");
+    }
+
     function clearMessageSearch() {
       document.getElementById("messageSearch").value = "";
       renderMessages(state.messages);
     }
 
+    document.getElementById("prompt").addEventListener("input", saveDraftValue);
+    document.getElementById("prompt").addEventListener("keydown", (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        event.preventDefault();
+        sendPrompt();
+      }
+    });
+
     toggleImportLimit();
     restoreUIState();
+    restoreDraftValue();
     loadAll();
   </script>
 </body>

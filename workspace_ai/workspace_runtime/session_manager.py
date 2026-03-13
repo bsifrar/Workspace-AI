@@ -113,6 +113,16 @@ class SessionManager:
         self.stream_manager.publish(event_type="workspace.session.updated", session_id=session_id, payload=updated)
         return {"status": "ok", "session": updated}
 
+    def delete_session(self, *, session_id: str) -> Dict[str, Any]:
+        session = self.store.get_session(session_id)
+        if session is None:
+            return {"status": "not_found", "session_id": session_id}
+        deleted = self.store.delete_session(session_id=session_id)
+        if not deleted:
+            return {"status": "not_found", "session_id": session_id}
+        self.stream_manager.publish(event_type="workspace.session.deleted", session_id=session_id, payload={"session_id": session_id})
+        return {"status": "ok", "deleted_session_id": session_id, "session": session}
+
     def resume_imported_session(self, *, query: str, project_id: str | None = None) -> Dict[str, Any]:
         matches = [row for row in self.store.search_sessions(query=query, project_id=project_id, limit=10) if row.get("source") == "chatgpt_export"]
         if not matches:
