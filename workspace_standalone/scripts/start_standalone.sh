@@ -1,5 +1,5 @@
 #!/bin/bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-exec "$ROOT_DIR/scripts/start.sh"
+echo "Deprecated: use workspace_standalone/scripts/start.sh instead."
+exit 1
