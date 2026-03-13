@@ -20,6 +20,14 @@ case "$cmd" in
       smoke) exec "$APP_DIR/scripts/smoke_test.sh" "$@" ;;
     esac
     ;;
+  start-external|status-external|smoke-external)
+    export WORKSPACE_ADAPTER_MODE=external
+    case "$cmd" in
+      start-external) exec "$APP_DIR/scripts/start.sh" "$@" ;;
+      status-external) exec "$APP_DIR/scripts/status.sh" "$@" ;;
+      smoke-external) exec "$APP_DIR/scripts/smoke_test.sh" "$@" ;;
+    esac
+    ;;
   stop)
     exec "$APP_DIR/scripts/stop.sh" "$@"
     ;;
@@ -37,6 +45,9 @@ Usage:
   ./workspace.sh status
   ./workspace.sh smoke
   ./workspace.sh secrets
+  ./workspace.sh start-external
+  ./workspace.sh status-external
+  ./workspace.sh smoke-external
 
 Defaults:
   start/status/smoke run in local null mode unless you explicitly set WORKSPACE_ADAPTER_MODE=external.

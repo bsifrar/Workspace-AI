@@ -389,6 +389,7 @@
         <div class="panel">
           <h2>Status</h2>
           <div id="status" class="status-grid muted">Loading...</div>
+          <p id="modeSummary" class="help-text" style="margin-top:10px;"></p>
           <p id="statusWarnings" class="help-text warning" style="margin-top:10px;"></p>
         </div>
         <div class="panel">
@@ -581,6 +582,8 @@
       <div id="wizardStatus" class="help-text"></div>
       <div class="toolbar-actions">
         <button onclick="bootstrapSetup()">Apply Setup</button>
+        <button class="secondary" onclick="setWizardMode('null')">Use Local Mode</button>
+        <button class="secondary" onclick="setWizardMode('external')">Use External Mode</button>
         <button class="secondary" onclick="prefillWizardFromSettings()">Reset To Current Values</button>
       </div>
     </div>
@@ -599,6 +602,7 @@
       currentSession: null,
       messageSearch: "",
       wizardMode: "null",
+      wizardOpenedOnce: false,
     };
 
     async function api(path, options = {}) {
@@ -754,6 +758,9 @@
       document.getElementById("wizardChoiceNull").classList.toggle("active", mode === "null");
       document.getElementById("wizardChoiceExternal").classList.toggle("active", mode === "external");
       document.getElementById("wizardExternalBaseUrl").disabled = mode !== "external";
+      document.getElementById("wizardStatus").textContent = mode === "null"
+        ? "Local mode keeps Workspace isolated and does not require any external service."
+        : "External mode expects a healthy HTTP service at the configured base URL.";
     }
 
     function prefillWizardFromSettings() {
@@ -839,6 +846,9 @@
       if (status.adapter?.adapter_mode === "external" && status.adapter?.status !== "ok") warnings.push("External adapter is not healthy.");
       if ((settings.remaining_daily_budget_usd || 0) <= 0) warnings.push("Daily budget cap has been exhausted.");
       document.getElementById("statusWarnings").textContent = warnings.join(" ");
+      document.getElementById("modeSummary").textContent = status.adapter?.adapter_mode === "external"
+        ? `External mode: ${settings.external_base_url || status.adapter?.external_base_url || "base URL not set"}`
+        : "Local mode: Workspace is running without any external dependency.";
       document.getElementById("adapterMode").textContent = status.adapter?.adapter_mode || "adapter";
       renderSetupChecklist();
     }
@@ -1157,7 +1167,8 @@
       renderStatus();
       renderSessions();
       await loadMessages();
-      if (state.settings && !state.settings.first_run_complete) {
+      if (state.settings && !state.settings.first_run_complete && !state.wizardOpenedOnce) {
+        state.wizardOpenedOnce = true;
         openSetupWizard();
       }
     }

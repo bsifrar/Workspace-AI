@@ -11,6 +11,14 @@ cd /Users/briansifrar/Workspace-AI
 ./workspace.sh start
 ```
 
+Explicit integration-mode commands:
+
+```bash
+./workspace.sh start-external
+./workspace.sh status-external
+./workspace.sh smoke-external
+```
+
 Other commands:
 
 ```bash

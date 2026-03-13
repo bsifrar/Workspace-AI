@@ -27,6 +27,9 @@ echo "Workspace Status"
 echo "Workspace host:   $WORKSPACE_HOST"
 echo "Workspace port:   $WORKSPACE_PORT"
 echo "Adapter mode:  $WORKSPACE_ADAPTER_MODE"
+if [[ "$WORKSPACE_ADAPTER_MODE" == "null" ]]; then
+    echo "Mode note:     local-only development mode (no external dependency required)"
+fi
 echo ""
 
 if [[ "$WORKSPACE_ADAPTER_MODE" == "external" ]]; then

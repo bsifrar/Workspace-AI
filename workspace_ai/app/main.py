@@ -25,7 +25,13 @@ def build_app() -> FastAPI:
 
     @app.get("/health")
     def health() -> dict:
-        return {"service": "workspace", "tagline": "Persistent AI Workspace", "adapter_mode": settings.adapter_mode}
+        return {
+            "service": "workspace",
+            "tagline": "Persistent AI Workspace",
+            "adapter_mode": settings.adapter_mode,
+            "external_base_url": settings.external_base_url if settings.adapter_mode == "external" else None,
+            "storage_path": str(settings.storage_path),
+        }
 
     @app.get("/ui", response_class=HTMLResponse)
     def ui() -> str:
